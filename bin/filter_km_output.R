@@ -450,7 +450,8 @@ km_results <- rbind(get0("km_fusions"),
 # Extract variant type from 'File' column and add as initial column
 km_results <- km_results %>%
   # remove '.txt' from end of fileName
-  mutate(File = gsub(".txt","", File)) %>%
+  mutate(File = gsub(".txt","", File)) %>% 
+  mutate(File = gsub("_R1.fastq.gz","",File)) %>% 
   # extract Target type from fileName
   tidyr::separate(File, c(NA, "Target_Type"), sep = "_") %>%
   # reorder columns to place Target_Type first
