@@ -31,11 +31,11 @@ while read line; do
   bash run_km.sh ${R1} ${R2} IGH
   
   # Directory setup for running Rscript
-  OUTPUTS=${BASE}/output
+  #OUTPUTS=${BASE}/output
   SAMPLE=`basename ${R1} _1.fastq.gz`
   
   # Run filter_km_output.R
-  Rscript ${BASE}/bin/filter_km_output.R ${OUTPUTS}/${SAMPLE}
+  Rscript bin/filter_km_output.R output/${SAMPLE}
   
 done < $1
   
