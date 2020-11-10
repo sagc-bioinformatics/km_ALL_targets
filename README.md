@@ -17,7 +17,7 @@ conda activate km
 
 2. Next we will ....
 ```
-git clone []
+git clone https://github.com/sagc-bioinformatics/km_ALL_targets.git
 ```
 
 3. Now we can install the km/jellyfish components using this `install.sh` script. 
