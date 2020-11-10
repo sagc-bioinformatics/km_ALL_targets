@@ -136,7 +136,6 @@ bash helper_script.sh sampleSheet.tsv
 
 - There will be `PathQuant.py:125: RuntimeWarning: invalid value encountered in greater_equal` warnings on km but these can be ignored
 - Summary Rscript requires `tidyverse`, `Biostrings` and `here` r packages and are installed at the start of the script. If there are any issues, it might be worth running on your local copy of R (rather than conda env).
-- The conda enviroment must be activated each time you run this analysis.
 
 ## Interpreting output
 
