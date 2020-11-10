@@ -10,9 +10,9 @@
 
 # Install stuff when needed
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager") 
+  install.packages("BiocManager")
+  BiocManager::install(c("tidyverse", "Biostrings", "here"), ask = F, update = F)
 }
-BiocManager::install(c("tidyverse", "Biostrings", "here"), ask = F, update = F)
 
 # Load sneakily
 suppressMessages(library(tidyverse, warn.conflicts = F, quietly = T))
@@ -67,12 +67,11 @@ if (isTRUE(file.exists(fusionFile))) {
                                             Query = col_character(),
                                             Type = col_character(),
                                             Variant_name = col_character(),
-                                            Ratio = col_double(),
+                                            rVAF = col_double(),
                                             Expression = col_double(),
                                             Min_coverage = col_double(),
                                             Start_offset = col_double(),
                                             Sequence = col_character(),
-                                            Reference_ratio = col_double(),
                                             Reference_expression = col_double(),
                                             Reference_sequence = col_character(),
                                             Info = col_character()))
@@ -82,15 +81,14 @@ if (isTRUE(file.exists(fusionFile))) {
     # exclude results for info != vs_ref or Type is ITD
     filter(Info == "vs_ref", Type != "ITD") %>%
     # select required fields
-    dplyr::select(Query,Type,Variant_name,Ratio,Expression,
+    dplyr::select(Query,Type,Variant_name,rVAF,Expression,
                   Min_coverage,Sequence,Reference_sequence) %>%
     # filter to exclude results when fusion not called
-    filter(Ratio > 0, Min_coverage > 0) %>%
+    filter(Min_coverage > 0) %>%
     # select query with greatest support (if > 1 path detected for a single fusion)
     dplyr::arrange(Query,desc(Min_coverage)) %>%
-    dplyr::distinct(Query, .keep_all=TRUE) %>%
-    # re-order results to list break-point with greatest support at top
-    dplyr::arrange(desc(Ratio),desc(Min_coverage),desc(Expression)) %>%
+    dplyr::distinct(Query, .keep_all=TRUE) %>% 
+    dplyr::arrange(desc(Min_coverage)) %>%
     # add fileName as a field in data.frame
     tibble::add_column(File = basename(fusionFile))
   
@@ -112,12 +110,11 @@ if (isTRUE(file.exists(SNVFile))) {
                                         Query = col_character(),
                                         Type = col_character(),
                                         Variant_name = col_character(),
-                                        Ratio = col_double(),
+                                        rVAF = col_double(),
                                         Expression = col_double(),
                                         Min_coverage = col_double(),
                                         Start_offset = col_double(),
                                         Sequence = col_character(),
-                                        Reference_ratio = col_double(),
                                         Reference_expression = col_double(),
                                         Reference_sequence = col_character(),
                                         Info = col_character()))
@@ -127,9 +124,9 @@ if (isTRUE(file.exists(SNVFile))) {
     # exclude results for info != vs_ref
     filter(Info == "vs_ref") %>%
     # exclude results where the target sequence without variant was detected or where SNV ratio < 0.1
-    filter(Type != "Reference", Ratio >= 0.1) %>%
+    filter(Type != "Reference", rVAF >= 0.1) %>%
     # select required cols
-    dplyr::select(Query,Type,Variant_name,Ratio,Expression,
+    dplyr::select(Query,Type,Variant_name,rVAF,Expression,
                   Min_coverage,Sequence,Reference_sequence) %>%
     # add fileName as a field in data.frame
     tibble::add_column(File = basename(SNVFile))
@@ -266,12 +263,11 @@ if (isTRUE(file.exists(focDelFile))) {
                                            Query = col_character(),
                                            Type = col_character(),
                                            Variant_name = col_character(),
-                                           Ratio = col_double(),
+                                           rVAF = col_double(),
                                            Expression = col_double(),
                                            Min_coverage = col_double(),
                                            Start_offset = col_double(),
                                            Sequence = col_character(),
-                                           Reference_ratio = col_double(),
                                            Reference_expression = col_double(),
                                            Reference_sequence = col_character(),
                                            Info = col_character()))
@@ -281,15 +277,15 @@ if (isTRUE(file.exists(focDelFile))) {
     # exclude results for info != vs_ref
     filter(Info == "vs_ref") %>%
     # filter only for exact matches to target sequence
-    filter(Type == "Reference", Ratio > 0) %>%
+    filter(Type == "Reference") %>%
     # Results with Min_coverage < 10 represent low confidence prediction
     # Likely spurious mis-spliced transcript; remove these results
     filter(Min_coverage >= 10) %>%
     # select required cols
-    dplyr::select(Query,Type,Variant_name,Ratio,Expression,
+    dplyr::select(Query,Type,Variant_name,rVAF,Expression,
                   Min_coverage,Sequence,Reference_sequence) %>%
     # re-order results to list break-point with greatest support at top
-    dplyr::arrange(desc(Ratio),desc(Min_coverage),desc(Expression)) %>%
+    dplyr::arrange(desc(rVAF),desc(Min_coverage),desc(Expression)) %>%
     # add fileName as a field in data.frame
     tibble::add_column(File = basename(focDelFile))
   
@@ -327,12 +323,11 @@ if (isTRUE(file.exists(DUX4File))) {
                                          Query = col_character(),
                                          Type = col_character(),
                                          Variant_name = col_character(),
-                                         Ratio = col_double(),
+                                         rVAF = col_double(),
                                          Expression = col_double(),
                                          Min_coverage = col_double(),
                                          Start_offset = col_double(),
                                          Sequence = col_character(),
-                                         Reference_ratio = col_double(),
                                          Reference_expression = col_double(),
                                          Reference_sequence = col_character(),
                                          Info = col_character()))
@@ -343,9 +338,9 @@ if (isTRUE(file.exists(DUX4File))) {
     # exclude results for info != vs_ref
     filter(Info == "vs_ref") %>%
     # filter only for exact matches to target sequence with min_cov > 10
-    filter(Ratio > 0, Min_coverage > 10) %>%
+    filter(Min_coverage > 10) %>%
     # select only required columns
-    dplyr::select(Query,Type,Variant_name,Ratio,Expression,
+    dplyr::select(Query,Type,Variant_name,rVAF,Expression,
                   Min_coverage,Sequence,Reference_sequence) %>% 
     # add col 'Alteration' 
     mutate(Alteration = "") %>% 
@@ -367,7 +362,7 @@ if (isTRUE(file.exists(DUX4File))) {
       tidyr::separate(Query, c("Gene","Chr","range"), sep = "_") %>%
       mutate(range = gsub("to"," - ",range)) %>%
       ## if sample has 2 hits for same range, select high with highest coverage
-      arrange(range, desc(Min_coverage),desc(Ratio),desc(Expression)) %>%
+      arrange(range, desc(Min_coverage),desc(Expression)) %>%
       dplyr::distinct(range, .keep_all = TRUE) %>%
       # count number targets detected in sample
       mutate(n_targets = nrow(.)) %>%
@@ -383,13 +378,13 @@ if (isTRUE(file.exists(DUX4File))) {
              Alteration = "DUX4-rearrangement", 
              Type = as.character(NA), 
              Variant_name = as.character(NA),
-             Ratio = as.integer(NA), 
+             rVAF = as.integer(NA), 
              Expression = paste(n_targets, "of 9 targets", sep = " "), 
              Min_coverage = paste("mean",mean_coverage, sep = " "), 
              Sequence = as.character(NA), 
              Reference_sequence = as.character(NA)) %>% 
       # re-order / drop extra cols
-      dplyr::select(Query,Alteration,Type,Variant_name,Ratio,Expression,
+      dplyr::select(Query,Alteration,Type,Variant_name,rVAF,Expression,
                     Min_coverage,Sequence,Reference_sequence,File)
       
 
@@ -408,12 +403,11 @@ if (isTRUE(file.exists(IGHFile))) {
                                         Query = col_character(),
                                         Type = col_character(),
                                         Variant_name = col_character(),
-                                        Ratio = col_double(),
+                                        rVAF = col_double(),
                                         Expression = col_double(),
                                         Min_coverage = col_double(),
                                         Start_offset = col_double(),
                                         Sequence = col_character(),
-                                        Reference_ratio = col_double(),
                                         Reference_expression = col_double(),
                                         Reference_sequence = col_character(),
                                         Info = col_character()))
@@ -424,15 +418,15 @@ if (isTRUE(file.exists(IGHFile))) {
     # exclude results for info != vs_ref
     filter(Info == "vs_ref") %>%
     # filter only for matches to target sequence
-    filter(Ratio > 0, Min_coverage > 0) %>%
+    filter(Min_coverage > 0) %>%
     # select only required columns
-    dplyr::select(Query,Type,Variant_name,Ratio,Expression,
+    dplyr::select(Query,Type,Variant_name,rVAF,Expression,
                   Min_coverage,Sequence,Reference_sequence) %>%
     # select query with greatest support (if > 1 path detected for a single fusion/break-point)
     dplyr::arrange(Query,desc(Min_coverage,Expression)) %>%
     dplyr::distinct(Query, .keep_all=TRUE) %>%
     # re-order results to list break-point with greatest support at top
-    dplyr::arrange(desc(Ratio),desc(Min_coverage),desc(Expression)) %>%
+    dplyr::arrange(desc(rVAF),desc(Min_coverage),desc(Expression)) %>%
     # add fileName as a field in data.frame
     tibble::add_column(File = basename(IGHFile))
 
