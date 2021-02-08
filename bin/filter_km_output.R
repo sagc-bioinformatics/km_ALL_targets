@@ -43,9 +43,9 @@ if (length(resultFiles) > 0) {
   # split results according to whether they are for fusions, variants or IKZF1
   fusionFile <- resultFiles[grepl("_Fusion.txt", resultFiles)]
   SNVFile <- resultFiles[grepl("_SNV.txt", resultFiles)]
-  focDelFile <- resultFiles[grepl("_FocDel.txt", resultFiles)]
+  focDelFile <- resultFiles[grepl("_focal_deletions.txt", resultFiles)]
   DUX4File <- resultFiles[grepl("_DUX4.txt", resultFiles)]
-  IGHFile <- resultFiles[grepl("_IGH.txt",resultFiles)]
+  IGHFile <- resultFiles[grepl("_IGH_fusion.txt",resultFiles)]
 
 } else {
   
@@ -119,6 +119,7 @@ if (isTRUE(file.exists(SNVFile))) {
                                         Reference_sequence = col_character(),
                                         Info = col_character()))
 
+  
   # Filter for queries where SNV detected
   km_SNV <- km_SNV %>%
     # exclude results for info != vs_ref
@@ -130,14 +131,41 @@ if (isTRUE(file.exists(SNVFile))) {
                   Min_coverage,Sequence,Reference_sequence) %>%
     # add fileName as a field in data.frame
     tibble::add_column(File = basename(SNVFile))
+  
+  ## Build SNV_anno file for targets tested against
+  SNV_anno <- km_SNV %>% 
+    dplyr::select(Query,Reference_sequence) %>% 
+    distinct(Query, .keep_all = TRUE) %>% 
+    separate(Query, c("Gene","Target_AA"), sep = "_", remove = FALSE) %>% 
+    ### determine the first_aa in string
+    # extract first target aa
+    mutate(Target_AA = gsub("-.*","",Target_AA)) %>% 
+    # remove characters leaving just the aa number
+    mutate(Target_AA = gsub("[^0-9.-]", "", Target_AA)) %>% 
+    # convert Target_AA from character to numeric
+    mutate(Target_AA = as.numeric(Target_AA)) %>% 
+    # subtract 11 to obtain the first aa position
+    mutate(first_aa_pos = (Target_AA - 11)) 
+    
+  # use biostrings to convert Ref_sequence for RNA to amino acid
+  SNV_anno <- SNV_anno %>% 
+    dplyr::select(Query, Reference_sequence) %>% 
+    # use tibble::deframe to convert to a named vector
+    tibble::deframe() %>% 
+    # convert to a DNAStringSet
+    DNAStringSet() %>% 
+    # translate to Amino acid sequence
+    translate(no.init.codon = TRUE) %>% 
+    # convert to a data.frame so easier to read
+    as.vector() %>% 
+    tibble::enframe() %>% 
+    dplyr::rename(Query = name, Ref_AAseq = value) %>% 
+    # combine with other information (i.e. first_aa)
+    left_join(SNV_anno, by = "Query")
 
 
 
   ### Annotate with AA change ###
-
-  # read-in the Annotation data
-  SNV_anno <- read.csv(file = here("bin", "Annotate_SNV_AAchanges.csv"),
-                       stringsAsFactors = FALSE)
 
   # only perform annotation step if variants were detected
 
@@ -254,26 +282,26 @@ if (isTRUE(file.exists(SNVFile))) {
 
 ########### IKZF1/ERG intgragenic deletion #############
 
-# check focdel.txt file exists
+# check FocalDel.txt file exists
 if (isTRUE(file.exists(focDelFile))) {
 
   # read-in km output
-  km_focDel <- read_delim(focDelFile, delim = "\t", skip = 9, comment = "#",
-                          col_types = cols(Database = col_character(),
-                                           Query = col_character(),
-                                           Type = col_character(),
-                                           Variant_name = col_character(),
-                                           rVAF = col_double(),
-                                           Expression = col_double(),
-                                           Min_coverage = col_double(),
-                                           Start_offset = col_double(),
-                                           Sequence = col_character(),
-                                           Reference_expression = col_double(),
-                                           Reference_sequence = col_character(),
-                                           Info = col_character()))
+  km_FocalDel <- read_delim(focDelFile, delim = "\t", skip = 9, comment = "#",
+                            col_types = cols(Database = col_character(),
+                                             Query = col_character(),
+                                             Type = col_character(),
+                                             Variant_name = col_character(),
+                                             rVAF = col_double(),
+                                             Expression = col_double(),
+                                             Min_coverage = col_double(),
+                                             Start_offset = col_double(),
+                                             Sequence = col_character(),
+                                             Reference_expression = col_double(),
+                                             Reference_sequence = col_character(),
+                                             Info = col_character()))
   
   # Filter for positive results
-  km_focDel <- km_focDel %>%
+  km_FocalDel <- km_FocalDel %>%
     # exclude results for info != vs_ref
     filter(Info == "vs_ref") %>%
     # filter only for exact matches to target sequence
@@ -290,7 +318,7 @@ if (isTRUE(file.exists(focDelFile))) {
     tibble::add_column(File = basename(focDelFile))
   
   # Edit df to ensure consistent reporting of all detected mutations
-  km_focDel <- km_focDel %>% 
+  km_FocalDel <- km_FocalDel %>% 
     # extract gene name from Query
     separate(Query, c("Gene","exon1","exon2"), sep = "_", remove = FALSE) %>% 
     mutate(exon1 = gsub("exon1"," 2-",exon1), 
@@ -354,14 +382,14 @@ if (isTRUE(file.exists(DUX4File))) {
 
 ##### Summarise number of targets detected and mean coverage #####
 
-  if(nrow(km_DUX4) > 0) {
+  if(nrow(km_DUX4) > 3) {
 
-    ## Confirm sample has DUX4 over >= 5 targets and if so report back # targets and mean_coverage ##
+    ## Confirm sample has DUX4 over >= 4 targets and if so report back # targets and mean_coverage ##
     DUX4_summary <- km_DUX4 %>%
       # separate Query into 3 components
       tidyr::separate(Query, c("Gene","Chr","range"), sep = "_") %>%
       mutate(range = gsub("to"," - ",range)) %>%
-      ## if sample has 2 hits for same range, select high with highest coverage
+      ## if sample has 2 hits for same range, select hit with highest coverage
       arrange(range, desc(Min_coverage),desc(Expression)) %>%
       dplyr::distinct(range, .keep_all = TRUE) %>%
       # count number targets detected in sample
@@ -439,19 +467,39 @@ if (isTRUE(file.exists(IGHFile))) {
 
 ############# Collate results into a single output csv #############
 
-# Join together all filtered data.frames
-km_results <- rbind(get0("km_fusions"),
-                    get0("DUX4_summary"),
-                    get0("km_DUX4"),
-                    get0("km_IGH"), 
-                    get0("km_SNV"), 
-                    get0("km_focDel"))
+# only add DUX4 results if DUX4_summary exists (i.e. Expression of 4+ targets)
+
+if (exists("DUX4_summary")) {
+  
+  # Join together all filtered data.frames
+  km_results <- rbind(get0("km_fusions"),
+                      get0("DUX4_summary"),
+                      get0("km_DUX4"),
+                      get0("km_IGH"), 
+                      get0("km_SNV"), 
+                      get0("km_FocalDel"))
+  
+} else {
+  
+  # Join together filtered data.frames except DUX4
+  km_results <- rbind(get0("km_fusions"),
+                      get0("km_IGH"), 
+                      get0("km_SNV"), 
+                      get0("km_FocalDel"))
+  
+  
+}
+
+
+
 
 # Extract variant type from 'File' column and add as initial column
 km_results <- km_results %>%
   # remove '.txt' from end of fileName
   mutate(File = gsub(".txt","", File)) %>% 
   mutate(File = gsub("_R1.fastq.gz","",File)) %>% 
+  mutate(File = gsub("focal_deletions","focalDeletion",File)) %>% 
+  mutate(File = gsub("IGH_fusion","IGH",File)) %>% 
   # extract Target type from fileName
   tidyr::separate(File, c(NA, "Target_Type"), sep = "_") %>%
   # reorder columns to place Target_Type first
