@@ -212,7 +212,7 @@ Usage: custom_variant_targets.sh [SNV_FILE] [GTF] [REF] [OUT_DIR]
 4. To run custom_variant_targets.sh using the above SNVtargets.txt file and add them the the ALL_targets/SNV directory:
 
 ```
-bash custom_variant_targets.sh fusionPairs.txt ~/genomes/Ensembl/GRCh37/ref-transcripts.gtf ~/genomes/Ensembl/GRCh37/GRCh37.fa.gz ~/km_ALL_targets/ALL_targets/SNV
+bash custom_variant_targets.sh SNVtargets.txt ~/genomes/Ensembl/GRCh37/ref-transcripts.gtf ~/genomes/Ensembl/GRCh37/GRCh37.fa.gz ~/km_ALL_targets/ALL_targets/SNV
 ```
 
 
