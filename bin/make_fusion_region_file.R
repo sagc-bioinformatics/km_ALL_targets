@@ -66,13 +66,13 @@ for(i in 1:nrow(target_file)){
     
     # gene1
     gene1_exon_data <- gene1_exon_data %>% 
-      filter(source == "protein_coding") %>% 
+      # filter(source == "protein_coding") %>% 
       distinct(start, end, .keep_all = TRUE) %>% 
       mutate(exon_number = as.numeric(exon_number))
       
     # gene2
     gene2_exon_data <- gene2_exon_data %>% 
-      filter(source == "protein_coding") %>% 
+      # filter(source == "protein_coding") %>% 
       distinct(start, end, .keep_all = TRUE) %>% 
       mutate(exon_number = as.numeric(exon_number))
       
