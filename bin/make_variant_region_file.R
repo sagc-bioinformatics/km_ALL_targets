@@ -45,11 +45,11 @@ for(i in 1:nrow(target_file)){
     
   } else {
     
-    print(paste("WARNING: Target", paste(target_file$X1[i], target_file$X2[i], sep = "_pos"),
-                "cannot be generated as it requires bases from the 5' UTR. Target will need to be created manually"))
+    print(paste("WARNING: Target for ", paste(target_file$X1[i], target_file$X2[i], sep = " amino acid position "),
+                " cannot be generated as it requires bases from the 5' UTR.", sep = "")) 
+    print(paste("Target will need to be created manually"))
     
-    # extract CDS information for given gene from gtf file
-    CDS_info <- data.frame(gtf_obj[gtf_obj$gene_name == target_file$X1[i] & gtf_obj$type == "CDS"])
+    next
     
   }
   
@@ -58,8 +58,8 @@ for(i in 1:nrow(target_file)){
     # need to be able to add AA.position as move across exons
     # therefore must ensure exons for a given transcript_id/transcript_name are in order
     mutate(exon_number = as.numeric(exon_number)) %>% 
-    dplyr::select(-source,-type,-score,-gene_source,-gene_biotype,-gene_id,
-                  -transcript_source,-exon_id,-ccds_id,-tag,-protein_id) %>% 
+    dplyr::select(seqnames,start,end,width,strand,phase,gene_name,transcript_id,
+                  transcript_name,exon_number) %>% 
     group_by(transcript_name) %>% 
     arrange(transcript_name) %>% 
     # number rows to indicate if first CDS exon, second CDS exon ...
@@ -364,25 +364,26 @@ for(i in 1:nrow(target_file)){
   
   # specify output fileName & write target region info to file
   file = paste("variantRegions", "_", target_file$X1[i], "_pos", target_aa_pos, ".txt", sep = "")
-  outLocation = paste("~/km_ALL_targets/", sep = "")
-  outFile  = paste(outLocation, file, sep = "")
-  write_tsv(targets, file = outFile, col_names = FALSE)
+  write_tsv(targets, file = file, col_names = FALSE)
+  
+  ## clean-up before next run of loop
+  rm(list = setdiff(ls(), c("gtf_obj","gtf_file","target_file")))
   
   ## extract region information for targets to be created 
-  current_SNV_anno <- targets %>%
-    mutate(Query = paste(transcript_name, "_", target_aa_pos, sep = ""),
-           ref_genome = "unk") %>%
-    dplyr::select(Query,ref_genome,strand,target_range1,target_range2,target_aa_pos,first_aa_pos) %>%
-    dplyr::rename(range1 = target_range1, range2 = target_range2, target_aa = target_aa_pos)
-
-  SNV_anno <- rbind(get0("current_SNV_anno"),
-                    get0("SNV_anno"))
+  # current_SNV_anno <- targets %>%
+  #   mutate(Query = paste(transcript_name, "_", target_aa_pos, sep = ""),
+  #          ref_genome = "unk") %>%
+  #   dplyr::select(Query,ref_genome,strand,target_range1,target_range2,target_aa_pos,first_aa_pos) %>%
+  #   dplyr::rename(range1 = target_range1, range2 = target_range2, target_aa = target_aa_pos)
+  # 
+  # SNV_anno <- rbind(get0("current_SNV_anno"),
+  #                   get0("SNV_anno"))
 
 }
 
-## write to separate file genomic regions for requested SNV targets
-print("Summary of genomic regions for requested SNV targets witten to 'custom_SNV_targets.csv' ")
-write_csv(SNV_anno, file = "custom_SNV_targets.csv", col_names = TRUE)
+# ## write to separate file genomic regions for requested SNV targets
+# print("Summary of genomic regions for requested SNV targets witten to 'custom_SNV_targets.csv' ")
+# write_csv(SNV_anno, file = "custom_SNV_targets.csv", col_names = TRUE)
 
 
 
